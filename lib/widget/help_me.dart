@@ -1,11 +1,16 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:location/location.dart';
 import 'package:scoped_model/scoped_model.dart';
+import 'package:tongmoopa/model/helpme_model.dart';
 import 'package:tongmoopa/model/list_item.dart';
 import 'package:tongmoopa/utlity/scoped_models/app_model.dart';
 import 'package:tongmoopa/utlity/search_section.dart';
@@ -16,8 +21,9 @@ class HelpMe extends StatefulWidget {
   _HelpMeState createState() => _HelpMeState();
 }
 
-
 class _HelpMeState extends State<HelpMe> {
+  String email, telephone, imageUrl, latitude, longtitude;
+
   TextEditingController emailController = TextEditingController();
   TextEditingController telephoneController = TextEditingController();
 
@@ -136,9 +142,12 @@ class _HelpMeState extends State<HelpMe> {
                 }
                 return message;
               },
-              onSaved: (value) => user.setEmail(
-                value.trim(),
-              ),
+              onSaved: (value) {
+                email = value.trim();
+                user.setEmail(
+                  value.trim(),
+                );
+              },
             ),
             Text('Tel:'),
             TextFormField(
@@ -151,7 +160,10 @@ class _HelpMeState extends State<HelpMe> {
                 }
                 return message;
               },
-              onSaved: (value) => user.setTelephone(value.trim()),
+              onSaved: (value) {
+                telephone = value.trim();
+                user.setTelephone(value.trim());
+              },
             ),
             Text('Real Pic:'),
             Row(
@@ -262,9 +274,39 @@ class _HelpMeState extends State<HelpMe> {
     return items;
   }
 
-  void validate() {
+  void validate() async {
     if (_formKey.currentState.validate()) {
       _formKey.currentState.save();
+
+      final model = ScopedModel.of<AppModel>(context, rebuildOnChange: false);
+      print(
+          'You Click Start ==>> ${model.userEmail}==${model.telephone}==${model.latittude}==${model.longittude}');
+
+     
+
+      await Firebase.initializeApp().then((value) async {
+        String nameImage = 'helper${Random().nextInt(100000)}.jpg';
+
+        FirebaseStorage firebaseStorage = FirebaseStorage.instance;
+        StorageReference reference =
+            firebaseStorage.ref().child('HelpME/$nameImage');
+        StorageUploadTask task = reference.putFile(_image);
+
+        imageUrl = await (await task.onComplete).ref.getDownloadURL();
+
+         HelpMeModel helpMeModel = HelpMeModel(
+          email: model.userEmail,
+          telephone: model.telephone,
+          imageUrl: imageUrl,
+          latitude: model.latittude.toString(),
+          longtitude: model.longittude.toString());
+
+        await FirebaseFirestore.instance
+            .collection('SOS')
+            .doc()
+            .set(helpMeModel.toJson())
+            .then((value) => print('Save SOS Success'));
+      });
     }
   }
 
